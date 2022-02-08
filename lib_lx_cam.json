@@ -1,0 +1,12 @@
+{
+    "name": "lib_lx_cam",
+    "target": "armv6",
+    "description": "[name]",
+    "scripts": "./lib_lx_cam",
+    "data": [
+        "Status"
+    ],
+    "control": [
+        "Capture"
+    ]
+}
