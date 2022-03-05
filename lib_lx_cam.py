@@ -12,7 +12,7 @@ import time
 
 import paho.mqtt.client as mqtt
 
-# import gphoto2 as gp
+import gphoto2 as gp
 
 import piexif
 from fractions import Fraction
