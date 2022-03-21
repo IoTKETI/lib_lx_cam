@@ -202,7 +202,7 @@ def main():
                 target = action()
 
                 if camera_status != "camera connection error":
-                    print('try if',camera_status)
+                    print('try if', camera_status)
                     lib_mqtt_client.publish(data_topic, 'captured')
 
                     insert_geotag(target)
@@ -213,7 +213,7 @@ def main():
                     print('Successfully sending photos to FTP server')
                     # ftp.close
                 else:
-                    print('try else',camera_status)
+                    print('try else', camera_status)
                     camera.exit()
 
                 camera.exit()
@@ -248,7 +248,7 @@ def insert_geotag(img_file):
     global gpi_data
 
     exif_dict = piexif.load(img_file)
-
+    print('==============================================================')
     if piexif.ImageIFD.Make in exif_dict["0th"]:
         print("Make is", exif_dict["0th"][piexif.ImageIFD.Make].decode('utf-8'))
     else:
@@ -367,6 +367,7 @@ def insert_geotag(img_file):
     else:
         pass
         # TODO: 없으면 카메라 정보 입력
+    print('==============================================================')
 
 
 if __name__ == "__main__":
