@@ -202,7 +202,7 @@ def main():
                 target = action()
 
                 if camera_status != "camera connection error":
-                    print(camera_status)
+                    print('try if',camera_status)
                     lib_mqtt_client.publish(data_topic, 'captured')
 
                     insert_geotag(target)
@@ -212,13 +212,13 @@ def main():
                     sending_file.close()
                     # ftp.close
                 else:
-                    print(camera_status)
+                    print('try else',camera_status)
 
                 camera.exit()
         except Exception as e:
             ftp.close()
             ftp = None
-            ftp_connect(ftp)
+            ftp = ftp_connect(ftp)
 
 
 def to_deg(value, loc):
