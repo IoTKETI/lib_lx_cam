@@ -205,7 +205,7 @@ def main():
                     print('try if', camera_status)
                     lib_mqtt_client.publish(data_topic, 'captured')
 
-                    insert_geotag(target)
+                    # insert_geotag(target)
 
                     sending_file = open(target, 'rb')
                     ftp.storbinary('STOR ' + '/FTP/' + target, sending_file)
