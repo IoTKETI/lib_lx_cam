@@ -197,6 +197,7 @@ def main():
 
     while True:
         try:
+            print('try')
             if cap_event & CONTROL_E:
                 cap_event &= (~CONTROL_E)
                 target = action()
