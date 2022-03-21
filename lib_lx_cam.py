@@ -40,6 +40,7 @@ camera_status = 'init'
 lib = dict()
 gpi_data = dict()
 
+
 def on_connect(client, userdata, flags, rc):
     global control_topic
     global broker_ip
@@ -119,7 +120,8 @@ def action():
         insert_geotag(target)
     except Exception as e:
         camera_status = 'camera connection error'
-        lib_mqtt_client.publish(data_topic, 'camera connection error')
+        print(e)
+        lib_mqtt_client.publish(data_topic, 'camera connection error' + str(e))
 
     return target
 
@@ -137,7 +139,17 @@ def send_status():
         time.sleep(1)
 
 
+def ftp_connect(ftp):
+    if ftp == None:
+        ftp = ftplib.FTP()
+        ftp.connect("gcs.iotocean.org", 50023)
+        ftp.login("lx_ftp", "lx123!")
+
+        return ftp
+
+
 def main():
+    global ftp
     global camera
     global lib_mqtt_client
     global control_topic
@@ -178,30 +190,35 @@ def main():
 
     msw_mqtt_connect()
 
-    ftp = ftplib.FTP()
-    ftp.connect("203.253.128.177", 50023)
-    ftp.login("d_keti", "keti123")
+    ftp = ftp_connect(ftp)
 
     t = threading.Thread(target=send_status, )
     t.start()
 
     while True:
-        if cap_event & CONTROL_E:
-            cap_event &= (~CONTROL_E)
-            target = action()
-            print(camera_status)
-            print('camera connection error')
-            if camera_status != "camera connection error":
-                print(camera_status)
-                lib_mqtt_client.publish(data_topic, 'captured')
+        try:
+            if cap_event & CONTROL_E:
+                cap_event &= (~CONTROL_E)
+                target = action()
 
-                insert_geotag(target)
+                if camera_status != "camera connection error":
+                    print(camera_status)
+                    lib_mqtt_client.publish(data_topic, 'captured')
 
-                sending_file = open(target, 'rb')
-                ftp.storbinary('STOR ' + '/Downloads/ftp_test/' + target, sending_file)
-                sending_file.close()
-                ftp.close
-            camera.exit()
+                    insert_geotag(target)
+
+                    sending_file = open(target, 'rb')
+                    ftp.storbinary('STOR ' + '/FTP/' + target, sending_file)
+                    sending_file.close()
+                    # ftp.close
+                else:
+                    print(camera_status)
+
+                camera.exit()
+        except Exception as e:
+            ftp.close()
+            ftp = None
+            ftp_connect(ftp)
 
 
 def to_deg(value, loc):
@@ -282,13 +299,15 @@ def insert_geotag(img_file):
     if piexif.GPSIFD.GPSLatitude in exif_dict["GPS"]:  # 위도 도,분,초
         print("GPSLatitude is", (exif_dict["GPS"][piexif.GPSIFD.GPSLatitude]))
     else:
-        lat, lat_ref = to_deg(gpi_data["lat"], ['S', 'N'])
+        # TODO: GPS 데이터 없을 경우
+        lat, lat_ref = to_deg(36.08584746715721, ['S', 'N'])
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitude] = lat
         gps_lat_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_lat_bytes, img_file)
     if piexif.GPSIFD.GPSLatitudeRef in exif_dict["GPS"]:  # 남-'S' / 북-'N'
         print("GPSLatitudeRef is", (exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef]).decode('utf-8'))
     else:
+        # TODO: GPS 데이터 없을 경우
         lat, lat_ref = to_deg(36.08584746715721, ['S', 'N'])
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = lat_ref
         gps_lat_bytes = piexif.dump(exif_dict)
@@ -337,7 +356,8 @@ def insert_geotag(img_file):
         pass
         # TODO: 없으면 카메라 정보 입력
     if piexif.ExifIFD.FocalPlaneResolutionUnit in exif_dict["Exif"]:  # Resolution 측정 단위 1-단위X/2-Inch/3-cm
-        print("FocalPlaneResolutionUnit is", (exif_dict["Exif"][piexif.ExifIFD.FocalPlaneResolutionUnit]).decode('utf-8'))
+        print("FocalPlaneResolutionUnit is",
+              (exif_dict["Exif"][piexif.ExifIFD.FocalPlaneResolutionUnit]).decode('utf-8'))
     elif piexif.ImageIFD.ResolutionUnit in exif_dict["0th"]:
         print("Use ResolutionUnit instead of FocalPlaneResolutionUnit.\r\n ResolutionUnit is",
               (exif_dict["0th"][piexif.ImageIFD.ResolutionUnit]))
