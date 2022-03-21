@@ -247,6 +247,10 @@ def to_deg(value, loc):
 def insert_geotag(img_file):
     global gpi_data
 
+    gpi_data['lat'] = 36.08584746715721
+    gpi_data['lon'] = 126.873364002257
+    gpi_data['alt'] = 50.03
+
     exif_dict = piexif.load(img_file)
     print('==============================================================')
     if piexif.ImageIFD.Make in exif_dict["0th"]:
@@ -303,7 +307,7 @@ def insert_geotag(img_file):
         print("GPSLatitude is", (exif_dict["GPS"][piexif.GPSIFD.GPSLatitude]))
     else:
         # TODO: GPS 데이터 없을 경우
-        lat, lat_ref = to_deg(36.08584746715721, ['S', 'N'])
+        lat, lat_ref = to_deg(gpi_data['lat'], ['S', 'N'])
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitude] = lat
         gps_lat_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_lat_bytes, img_file)
@@ -311,29 +315,28 @@ def insert_geotag(img_file):
         print("GPSLatitudeRef is", (exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef]).decode('utf-8'))
     else:
         # TODO: GPS 데이터 없을 경우
-        lat, lat_ref = to_deg(36.08584746715721, ['S', 'N'])
+        lat, lat_ref = to_deg(gpi_data['lat'], ['S', 'N'])
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = lat_ref
         gps_lat_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_lat_bytes, img_file)
     if piexif.GPSIFD.GPSLongitude in exif_dict["GPS"]:
         print("GPSLongitude is", (exif_dict["GPS"][piexif.GPSIFD.GPSLongitude]))
     else:
-        lon, lon_ref = to_deg(126.873364002257, ['W', 'E'])
+        lon, lon_ref = to_deg(gpi_data['lon'], ['W', 'E'])
         exif_dict["GPS"][piexif.GPSIFD.GPSLongitude] = lon
         gps_lon_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_lon_bytes, img_file)
     if piexif.GPSIFD.GPSLongitudeRef in exif_dict["GPS"]:  # 동-'E' / 서-'W'
         print("GPSLongitudeRef is", (exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef]).decode('utf-8'))
     else:
-        lon, lon_ref = to_deg(126.873364002257, ['W', 'E'])
+        lon, lon_ref = to_deg(gpi_data['lon'], ['W', 'E'])
         exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] = lon_ref
         gps_lon_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_lon_bytes, img_file)
     if piexif.GPSIFD.GPSAltitude in exif_dict["GPS"]:
         print("GPSAltitude is", (exif_dict["GPS"][piexif.GPSIFD.GPSAltitude]))
     else:
-        alt = 50.03
-        f = Fraction(str(alt))
+        f = Fraction(str(gpi_data['alt']))
         exif_dict["GPS"][piexif.GPSIFD.GPSAltitude] = (f.numerator, f.denominator)
         gps_alt_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_alt_bytes, img_file)
