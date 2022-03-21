@@ -73,6 +73,7 @@ def on_message(client, userdata, msg):
     if lib["control"][0] in msg.topic:
         message = str(msg.payload.decode("utf-8")).lower()
         if message == 'g':
+            print('[on_message] action')
             cap_event |= CONTROL_E
     elif 'global_position_int' in msg.topic:
         gpi_data = json.loads(msg.payload.decode("utf-8"))
