@@ -216,6 +216,7 @@ def main():
 
                 camera.exit()
         except Exception as e:
+            print('main except' + e)
             ftp.close()
             ftp = None
             ftp = ftp_connect(ftp)
