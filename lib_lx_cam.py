@@ -73,7 +73,6 @@ def on_message(client, userdata, msg):
     if lib["control"][0] in msg.topic:
         message = str(msg.payload.decode("utf-8")).lower()
         if message == 'g':
-            print('[on_message] action')
             cap_event |= CONTROL_E
     elif 'global_position_int' in msg.topic:
         gpi_data = json.loads(msg.payload.decode("utf-8"))
@@ -200,7 +199,6 @@ def main():
         try:
             if cap_event & CONTROL_E:
                 cap_event &= (~CONTROL_E)
-                print('action')
                 target = action()
 
                 if camera_status != "camera connection error":
@@ -212,9 +210,11 @@ def main():
                     sending_file = open(target, 'rb')
                     ftp.storbinary('STOR ' + '/FTP/' + target, sending_file)
                     sending_file.close()
+                    print('Successfully sending photos to FTP server')
                     # ftp.close
                 else:
                     print('try else',camera_status)
+                    camera.exit()
 
                 camera.exit()
         except Exception as e:
