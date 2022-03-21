@@ -197,9 +197,9 @@ def main():
 
     while True:
         try:
-            print('try')
             if cap_event & CONTROL_E:
                 cap_event &= (~CONTROL_E)
+                print('action')
                 target = action()
 
                 if camera_status != "camera connection error":
