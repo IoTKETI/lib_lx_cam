@@ -247,6 +247,7 @@ def to_deg(value, loc):
 def insert_geotag(img_file):
     global gpi_data
 
+    # TODO: 삭제
     gpi_data['lat'] = 36.08584746715721
     gpi_data['lon'] = 126.873364002257
     gpi_data['alt'] = 50.03
