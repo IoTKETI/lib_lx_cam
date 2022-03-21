@@ -1,6 +1,6 @@
 {
     "name": "lib_lx_cam",
-    "target": "armv6",
+    "target": "armv7l",
     "description": "[name]",
     "scripts": "./lib_lx_cam",
     "data": [
