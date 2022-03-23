@@ -104,7 +104,7 @@ def ftp_connect():
     global ftp_client
 
     try:
-        if ftp_client == None:
+        if ftp_client is None:
             ftp_client = ftplib.FTP()
             ftp_client.connect("gcs.iotocean.org", 50023)
             ftp_client.login("lx_ftp", "lx123!")
@@ -134,7 +134,7 @@ def action():
 
     try:
         # TODO: 2. 카메라 연결 유지
-        if camera == None:
+        if camera is None:
             camera = gp.Camera()
             camera.init()
 
@@ -148,8 +148,18 @@ def action():
     except Exception as e:
         camera_status = '[Error]\n Failed to connect with camera'
         print('[Error]\n' + str(e))
-        # target = './DSC00029.JPG'
-        # TODO: 촬영 실패 처리
+        if camera is not None:
+            camera.exit()
+            camera = None
+            camera = gp.Camera()
+            camera.init()
+        else:
+            camera = gp.Camera()
+            camera.init()
+        file_path = camera.capture(gp.GP_CAPTURE_IMAGE)
+        camera_file = camera.file_get(
+            file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL)
+        camera_file.save(target)
 
     return target
 
@@ -165,8 +175,8 @@ def send_image2ftp(image):
         camera_status = '[Ready]\n Successfully sending photo to FTP server'
         print('Successfully sending photo to FTP server')
     except Exception as e:
-        print('[Error]\n' + str(e))
-        camera_status = '[Error]\n' + str(e)
+        print('[Error]\n' + 'send_image2ftp - ' + str(e))
+        camera_status = '[Error]\n' + 'send_image2ftp - ' + str(e)
         # TODO: 3. 전송 실패 처리
 
 
@@ -405,8 +415,8 @@ def main():
                 #
                 # camera.exit()
         except Exception as e:
-            print('[Error]\n' + str(e))
-            camera_status = '[Error]\n' + str(e)
+            print('[Error]\n' + 'main - ' + str(e))
+            camera_status = '[Error]\n' + 'main - ' + str(e)
 
 
 if __name__ == "__main__":
