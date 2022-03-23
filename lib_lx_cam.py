@@ -193,7 +193,7 @@ def send_image2ftp():
 
             del image_arr[0]
         else:
-            if finish_flag:
+            if not finish_flag:
                 finish_flag = True
                 camera_status = '[Finish]\n Finish sending photo to FTP server'
                 print('Finish sending photo to FTP server')
