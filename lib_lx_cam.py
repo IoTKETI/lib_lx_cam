@@ -191,7 +191,8 @@ def send_image2ftp():
 
             del image_arr[0]
         else:
-            pass
+            camera_status = '[Finish]\n Finish sending photo to FTP server'
+            print('Finish sending photo to FTP server')
 
 
 def to_deg(value, loc):
