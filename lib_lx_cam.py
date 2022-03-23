@@ -150,7 +150,7 @@ def action():
         camera_status = '[Ready]\n The photo was successfully taken.'
     except Exception as e:
         camera_status = '[Error]\n Failed to connect with camera'
-        print('[Error]\n' + str(e))
+        print('[Error]\naction - ' + str(e))
         if camera is not None:
             camera.exit()
             camera = None
