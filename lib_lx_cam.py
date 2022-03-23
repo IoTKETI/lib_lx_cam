@@ -35,6 +35,8 @@ camera_status = 'init'
 lib = dict()
 gpi_data = dict()
 
+image_arr = []
+
 
 def on_connect(client, userdata, flags, rc):
     global control_topic
@@ -127,6 +129,7 @@ def ftp_connect():
 def action():
     global camera
     global camera_status
+    global image_arr
 
     file_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
         '%Y-%m-%dT%H:%M:%S.%f')
@@ -160,24 +163,33 @@ def action():
         camera_file = camera.file_get(
             file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL)
         camera_file.save(target)
+        insert_geotag(target)
 
-    return target
+    image_arr.append(target)
 
 
 def send_image2ftp(image):
     global ftp_client
     global camera_status
+    global image_arr
 
-    try:
-        sending_file = open(image, 'rb')
-        ftp_client.storbinary('STOR ' + '/FTP/' + image, sending_file)
-        sending_file.close()
-        camera_status = '[Ready]\n Successfully sending photo to FTP server'
-        print('Successfully sending photo to FTP server')
-    except Exception as e:
-        print('[Error]\n' + 'send_image2ftp - ' + str(e))
-        camera_status = '[Error]\n' + 'send_image2ftp - ' + str(e)
-        # TODO: 3. 전송 실패 처리
+    while True:
+        if len(image_arr) > 0:
+            try:
+                sending_file = open(image_arr[0], 'rb')
+                ftp_client.storbinary('STOR ' + '/FTP/' + image_arr[0], sending_file)
+                sending_file.close()
+                camera_status = '[Ready]\n Successfully sending photo to FTP server'
+                print('Successfully sending photo to FTP server')
+            except Exception as e:
+                print('[Error]\n' + 'send_image2ftp - ' + str(e))
+                camera_status = '[Error]\n' + 'send_image2ftp - ' + str(e)
+                ftp_connect()
+                sending_file = open(image_arr[0], 'rb')
+                ftp_client.storbinary('STOR ' + '/FTP/' + image_arr[0], sending_file)
+                sending_file.close()
+        else:
+            pass
 
 
 def to_deg(value, loc):
@@ -398,14 +410,17 @@ def main():
     t = threading.Thread(target=send_status, )
     t.start()
 
+    sendtoFTP = threading.Thread(target=send_image2ftp, )
+    sendtoFTP.start()
+
     while True:
         try:
             if cap_event & CONTROL_E:
                 cap_event &= (~CONTROL_E)
-                target = action()  # TODO: 1. 딜레이 문제
-                print(target)
+                action()  # TODO: 딜레이 - 1-2s
+
                 # if not('Error' in camera_status):
-                #     insert_geotag(target)
+                #     insert_geotag(target)  # TODO: send_image2ftp 함수 안으로
                 #
                 #     send_image2ftp(target)
 
