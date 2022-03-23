@@ -188,6 +188,8 @@ def send_image2ftp():
                 sending_file = open(image_arr[0], 'rb')
                 ftp_client.storbinary('STOR ' + '/FTP/' + image_arr[0], sending_file)
                 sending_file.close()
+
+            del image_arr[0]
         else:
             pass
 
