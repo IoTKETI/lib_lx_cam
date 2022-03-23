@@ -173,8 +173,6 @@ def send_image2ftp():
     global camera_status
     global image_arr
 
-    finish_flag = False
-
     while True:
         if len(image_arr) > 0:
             try:
@@ -193,8 +191,7 @@ def send_image2ftp():
 
             del image_arr[0]
         else:
-            if not finish_flag:
-                finish_flag = True
+            if not 'Finish' in camera_status:
                 camera_status = '[Finish]\n Finish sending photo to FTP server'
                 print('Finish sending photo to FTP server')
 
