@@ -403,11 +403,11 @@ def main():
             if cap_event & CONTROL_E:
                 cap_event &= (~CONTROL_E)
                 target = action()  # TODO: 1. 딜레이 문제
-
-                if not('Error' in camera_status):
-                    insert_geotag(target)
-
-                    send_image2ftp(target)
+                print(target)
+                # if not('Error' in camera_status):
+                #     insert_geotag(target)
+                #
+                #     send_image2ftp(target)
 
                 # TODO: 2. camera.exit() 유무 테스트
                 # else:
