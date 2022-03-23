@@ -168,7 +168,7 @@ def action():
     image_arr.append(target)
 
 
-def send_image2ftp(image):
+def send_image2ftp():
     global ftp_client
     global camera_status
     global image_arr
