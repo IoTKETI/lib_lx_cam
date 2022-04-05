@@ -4,10 +4,10 @@ import json
 import os
 import threading
 import time
+import glob
+import subprocess
 
 import paho.mqtt.client as mqtt
-
-import gphoto2 as gp
 
 import piexif
 from fractions import Fraction
@@ -28,6 +28,7 @@ port = 1883
 
 cap_event = 0x00
 CONTROL_E = 0x01
+STOP_E = 0x02
 
 my_msw_name = ''
 camera_status = 'init'
@@ -37,12 +38,18 @@ gpi_data = dict()
 
 image_arr = []
 
+dir_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
+    '%Y-%m-%d')
+if not os.path.exists(dir_name):
+    os.makedirs(dir_name)
+
+captureImage = None
+interval = 3
+
 
 def on_connect(client, userdata, flags, rc):
     global control_topic
     global broker_ip
-    global cap_event
-    global CONTROL_E
     global lib
 
     print('[msw_mqtt_connect] connect to ', broker_ip)
@@ -64,13 +71,21 @@ def on_subscribe(client, userdata, mid, granted_qos):
 def on_message(client, userdata, msg):
     global cap_event
     global CONTROL_E
+    global STOP_E
     global lib
     global gpi_data
+    global interval
 
     if lib["control"][0] in msg.topic:
         message = str(msg.payload.decode("utf-8")).lower()
-        if message == 'g':
+        if 'g' in message:
+            try:
+                interval = message.split(' ')[1]
+            except Exception as e:
+                interval = 3
             cap_event |= CONTROL_E
+        if message == 's':
+            cap_event |= STOP_E
     elif 'global_position_int' in msg.topic:
         gpi_data = json.loads(msg.payload.decode("utf-8"))
 
@@ -110,87 +125,90 @@ def ftp_connect():
             ftp_client = ftplib.FTP()
             ftp_client.connect("gcs.iotocean.org", 50023)
             ftp_client.login("lx_ftp", "lx123!")
-            camera_status = '[Ready]\n Successfully connect to FTP server'
+            camera_status = 'Ready'
         else:
-            camera_status = '[Error]\n Failed to connect to FTP server'
             ftp_client.close()
             ftp_client = None
             ftp_client = ftplib.FTP()
             ftp_client.connect("gcs.iotocean.org", 50023)
             ftp_client.login("lx_ftp", "lx123!")
-            camera_status = '[Ready]\n Successfully connect to FTP server'
+            camera_status = 'Ready'
 
     except Exception as e:
         print('[Error]\n' + str(e))
-        camera_status = '[Error]\n Failed to connect to FTP server'
+        camera_status = 'Failed FTP'
         ftp_connect()
 
 
 def action():
-    global camera
     global camera_status
-    global image_arr
-
-    file_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
-        '%Y-%m-%dT%H:%M:%S.%f')
-    target = os.path.join('./', file_name + '.jpg')
+    global captureImage
+    global interval
 
     try:
-        # TODO: 2. 카메라 연결 유지
-        if camera is None:
-            camera = gp.Camera()
-            camera.init()
-
-        file_path = camera.capture(gp.GP_CAPTURE_IMAGE)
-        camera_file = camera.file_get(
-            file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL)
-        camera_file.save(target)
-
-        insert_geotag(target)
-        camera_status = '[Ready]\n The photo was successfully taken.'
+        captureImage = subprocess.Popen(
+            ['gphoto2', '--capture-image-and-download', '--interval', str(interval), '--filename', '20%y-%m-%dT%H:%M:%S.jpg',
+             '--folder', './'], stdout=subprocess.PIPE)
+        print('Start taking pictures')
+        camera_status = 'start'
     except Exception as e:
-        camera_status = '[Error]\n Failed to connect with camera'
         print('[Error]\naction - ' + str(e))
-        if camera is not None:
-            camera.exit()
-            camera = None
-            camera = gp.Camera()
-            camera.init()
-        else:
-            camera = gp.Camera()
-            camera.init()
-        file_path = camera.capture(gp.GP_CAPTURE_IMAGE)
-        camera_file = camera.file_get(
-            file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL)
-        camera_file.save(target)
-        insert_geotag(target)
 
-    image_arr.append(target)
+
+def ret_imagefile():
+    global image_arr
+    global dir_name
+    global camera_status
+
+    while True:
+        try:
+            files = glob.glob('*.jpg')
+            if len(files) > 0:
+                if camera_status is 'stop':
+                    camera_status = 'ready2finish'
+                files.sort(key=os.path.getmtime)
+        except Exception as e:
+            files = glob.glob('*.jpg')
+            if len(files) > 0:
+                files.sort(key=os.path.getmtime)
+
+        if len(image_arr) == 0:
+            image_arr = files
+        else:
+            for i in range(len(files)):
+                if files[i] not in image_arr:
+                    if i is not 0:
+                        image_arr.append(files[i])
 
 
 def send_image2ftp():
     global ftp_client
     global camera_status
     global image_arr
+    global dir_name
 
     while True:
         if len(image_arr) > 0:
             try:
+                insert_geotag(image_arr[0])
+                time.sleep(1)
                 sending_file = open(image_arr[0], 'rb')
-                ftp_client.storbinary('STOR ' + '/FTP/' + image_arr[0], sending_file)
+                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + image_arr[0], sending_file)
                 sending_file.close()
-                camera_status = '[Ready]\n Successfully sending photo to FTP server'
-                print('Successfully sending photo to FTP server')
+                os.replace(image_arr[0], dir_name + '/' + image_arr[0])
+                del image_arr[0]
+            except FileNotFoundError as e:
+                del image_arr[0]
+                camera_status = 'FileNotFoundError ' + str(e)
+                error_file = str(e).split("'")
+                if error_file in os.listdir(dir_name):
+                    pass
             except Exception as e:
-                print('[Error]\n' + 'send_image2ftp - ' + str(e))
-                camera_status = '[Error]\n' + 'send_image2ftp - ' + str(e)
-                ftp_connect()
-                sending_file = open(image_arr[0], 'rb')
-                ftp_client.storbinary('STOR ' + '/FTP/' + image_arr[0], sending_file)
-                sending_file.close()
-
-            del image_arr[0]
+                camera_status = 'Error' + str(e)
         else:
+            if camera_status is 'ready2finish':  # TODO: 고도 0이면?
+                camera_status = 'finish'
+            time.sleep(1)
             pass
 
 
@@ -217,12 +235,12 @@ def to_deg(value, loc):
 def insert_geotag(img_file):
     global gpi_data
 
-    # TODO: 삭제
+    print_flag = False
+
+    # TODO: 아래 임시 좌표 삭제
     gpi_data['lat'] = 36.08584746715721
     gpi_data['lon'] = 126.873364002257
     gpi_data['alt'] = 50.03
-    print_flag = False
-    # TODO: 삭제
 
     exif_dict = piexif.load(img_file)
     if print_flag:
@@ -380,7 +398,10 @@ def main():
     global my_lib_name
     global cap_event
     global CONTROL_E
+    global STOP_E
     global camera_status
+    global captureImage
+    global dir_name
 
     try:
         lib = dict()
@@ -409,32 +430,33 @@ def main():
 
     ftp_connect()
 
+    if dir_name in ftp_client.nlst():
+        ftp_client.cwd(dir_name)
+    else:
+        ftp_client.mkd(dir_name)
+        ftp_client.cwd(dir_name)
+
     t = threading.Thread(target=send_status, )
     t.start()
 
     sendtoFTP = threading.Thread(target=send_image2ftp, )
     sendtoFTP.start()
 
+    retrieveImage = threading.Thread(target=ret_imagefile, )
+    retrieveImage.start()
+
     while True:
-        try:
-            if cap_event & CONTROL_E:
-                cap_event &= (~CONTROL_E)
-                action()  # TODO: 딜레이 - 1-2s
+        if cap_event & CONTROL_E:
+            cap_event &= (~CONTROL_E)
+            action()
 
-                # if not('Error' in camera_status):
-                #     insert_geotag(target)  # TODO: send_image2ftp 함수 안으로
-                #
-                #     send_image2ftp(target)
-
-                # TODO: 2. camera.exit() 유무 테스트
-                # else:
-                #     camera.exit()
-                #
-                # camera.exit()
-        except Exception as e:
-            print('[Error]\n' + 'main - ' + str(e))
-            camera_status = '[Error]\n' + 'main - ' + str(e)
+        elif cap_event & STOP_E:
+            captureImage.terminate()
+            print('Stop taking pictures')
+            camera_status = 'stop'
+            cap_event &= (~STOP_E)
 
 
 if __name__ == "__main__":
     main()
+
