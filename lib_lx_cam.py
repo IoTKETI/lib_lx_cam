@@ -26,22 +26,23 @@ data_topic = ''
 broker_ip = 'localhost'
 port = 1883
 
+ftpUserID = 'lx_ftp'
+ftpUserPW = 'lx123!'
+
 cap_event = 0x00
 CONTROL_E = 0x01
 STOP_E = 0x02
 
-my_msw_name = ''
-camera_status = 'init'
+msw_status = 'Init'
+mqtt_status = 'disconnected'
+ftp_status = 'disconnected'
 
 lib = dict()
 gpi_data = dict()
 
 image_arr = []
 
-dir_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
-    '%Y-%m-%d')
-if not os.path.exists(dir_name):
-    os.makedirs(dir_name)
+dir_name = ''
 
 captureImage = None
 interval = 3
@@ -51,6 +52,7 @@ def on_connect(client, userdata, flags, rc):
     global control_topic
     global broker_ip
     global lib
+    global mqtt_status
 
     print('[msw_mqtt_connect] connect to ', broker_ip)
     lib_mqtt_client.subscribe(control_topic, 0)
@@ -58,6 +60,7 @@ def on_connect(client, userdata, flags, rc):
     gpi_topic = '/MUV/control/' + lib['name'] + '/global_position_int'
     lib_mqtt_client.subscribe(gpi_topic, 0)
     print('[lib]gpi_topic\n', gpi_topic)
+    mqtt_status = 'connected'
 
 
 def on_disconnect(client, userdata, flags, rc=0):
@@ -75,14 +78,34 @@ def on_message(client, userdata, msg):
     global lib
     global gpi_data
     global interval
+    global dir_name
 
     if lib["control"][0] in msg.topic:
-        message = str(msg.payload.decode("utf-8")).lower()
+        message = str(msg.payload.decode("utf-8"))
         if 'g' in message:
             try:
-                interval = message.split(' ')[1]
+                msg_arr = message.split(' ')
+                if len(msg_arr) > 2:
+                    interval = msg_arr[1]
+                    dir_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
+                        '%Y-%m-%d') + '-' + msg_arr[2]
+                    dir_name = dir_name.replace("'", "")
+                    if not os.path.exists(dir_name):
+                        os.makedirs(dir_name)
+                elif len(msg_arr) > 1:
+                    interval = msg_arr[1]
+                    dir_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
+                        '%Y-%m-%d %H')
+                    dir_name = dir_name.replace("'", "")
+                    if not os.path.exists(dir_name):
+                        os.makedirs(dir_name)
             except Exception as e:
                 interval = 3
+                dir_name = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime(
+                    '%Y-%m-%d %H')
+                dir_name = dir_name.replace("'", "")
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
             cap_event |= CONTROL_E
         if message == 's':
             cap_event |= STOP_E
@@ -108,49 +131,46 @@ def msw_mqtt_connect():
 
 def send_status():
     global lib_mqtt_client
-    global camera_status
+    global msw_status
     global data_topic
+    global mqtt_status
+    global ftp_status
 
+    finish_count = 0
     while True:
-        lib_mqtt_client.publish(data_topic, camera_status)
+        if 'Init' in msw_status:
+            if mqtt_status is 'connected' and ftp_status is 'connected':
+                msw_status = 'Ready'
+            else:
+                if mqtt_status is not 'connected':
+                    msw_status = 'Init - MQTT is not connected'
+                elif ftp_status is not 'connected':
+                    msw_status = 'Init - FTP is not connected'
+
+        elif msw_status is 'Finish':
+            finish_count += 1
+            if finish_count > 3:
+                msw_status = 'Ready'
+
+        else:
+            pass
+
+        lib_mqtt_client.publish(data_topic, msw_status)
         time.sleep(1)
 
 
-def ftp_connect():
-    global camera_status
-    global ftp_client
-
-    try:
-        if ftp_client is None:
-            ftp_client = ftplib.FTP()
-            ftp_client.connect("gcs.iotocean.org", 50023)
-            ftp_client.login("lx_ftp", "lx123!")
-            camera_status = 'Ready'
-        else:
-            ftp_client.close()
-            ftp_client = None
-            ftp_client = ftplib.FTP()
-            ftp_client.connect("gcs.iotocean.org", 50023)
-            ftp_client.login("lx_ftp", "lx123!")
-            camera_status = 'Ready'
-
-    except Exception as e:
-        print('[Error]\n' + str(e))
-        camera_status = 'Failed FTP'
-        ftp_connect()
-
-
 def action():
-    global camera_status
+    global msw_status
     global captureImage
     global interval
 
     try:
         captureImage = subprocess.Popen(
-            ['gphoto2', '--capture-image-and-download', '--interval', str(interval), '--filename', '20%y-%m-%dT%H:%M:%S.jpg',
+            ['gphoto2', '--capture-image-and-download', '--interval', str(interval), '--filename',
+             '20%y-%m-%dT%H:%M:%S.jpg',
              '--folder', './'], stdout=subprocess.PIPE)
         print('Start taking pictures')
-        camera_status = 'start'
+        msw_status = 'Capture'
     except Exception as e:
         print('[Error]\naction - ' + str(e))
 
@@ -158,58 +178,107 @@ def action():
 def ret_imagefile():
     global image_arr
     global dir_name
-    global camera_status
+    global msw_status
 
-    while True:
-        try:
-            files = glob.glob('*.jpg')
-            if len(files) > 0:
-                if camera_status is 'stop':
-                    camera_status = 'ready2finish'
-                files.sort(key=os.path.getmtime)
-        except Exception as e:
-            files = glob.glob('*.jpg')
-            if len(files) > 0:
-                files.sort(key=os.path.getmtime)
+    # files = glob.glob('*.jpg')
+    # if msw_status is 'Stop':
+    #     if len(files) > 0:
+    #         msw_status = 'Ready2Finish'
+    #         files.sort(key=os.path.getmtime)
+    #         for i in range(len(files)):
+    #             if files[i] not in image_arr:
+    #                 image_arr.append(files[i])
+    #     else:
+    #         msw_status = 'Finish'
+    #         image_arr = files
+    # 
+    # return image_arr
 
-        if len(image_arr) == 0:
-            image_arr = files
+    files = os.popen('ls')
+    file_arr = files.read()
+    file_arr = file_arr.split('\n')
+    file_arr = list(filter(filtering, file_arr))
+
+    if msw_status is 'Stop':
+        if len(file_arr) > 0:
+            msw_status = 'Ready2Finish'
+            file_arr.sort(key=os.path.getmtime)
+            for i in range(len(file_arr)):
+                if file_arr[i] not in image_arr:
+                    image_arr.append(file_arr[i])
         else:
-            for i in range(len(files)):
-                if files[i] not in image_arr:
-                    if i is not 0:
-                        image_arr.append(files[i])
+            msw_status = 'Finish'
+            image_arr = file_arr
+
+    return image_arr
+
+
+def ftp_connect():
+    global ftp_status
+    global ftp_client
+
+    try:
+        if ftp_client is None:
+            ftp_client = ftplib.FTP()
+            ftp_client.connect("gcs.iotocean.org", 50023)
+            ftp_client.login(ftpUserID, ftpUserPW)
+            ftp_status = 'connected'
+        else:
+            ftp_client.close()
+            ftp_client = None
+            ftp_client = ftplib.FTP()
+            ftp_client.connect("gcs.iotocean.org", 50023)
+            ftp_client.login(ftpUserID, ftpUserPW)
+            ftp_status = 'connected'
+
+    except Exception as e:
+        print('[Error]\n' + str(e))
+        ftp_status = 'disconnected'
+        ftp_connect()
+
+
+def filtering(x):
+    return x.endswith('.jpg')
 
 
 def send_image2ftp():
     global ftp_client
-    global camera_status
-    global image_arr
+    global msw_status
     global dir_name
 
+    crt_flag = False
+
     while True:
-        if len(image_arr) > 0:
+        imageList = ret_imagefile()
+        if len(imageList) > 0:
+            if dir_name is not '' and not crt_flag:
+                if dir_name in ftp_client.nlst():
+                    ftp_client.cwd(dir_name)
+                else:
+                    ftp_client.mkd(dir_name)
+                    ftp_client.cwd(dir_name)
+                crt_flag = True
+
             try:
-                insert_geotag(image_arr[0])
+                insert_geotag(imageList[0])
                 time.sleep(1)
-                sending_file = open(image_arr[0], 'rb')
-                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + image_arr[0], sending_file)
+                sending_file = open(imageList[0], 'rb')
+                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + imageList[0], sending_file)
                 sending_file.close()
-                os.replace(image_arr[0], dir_name + '/' + image_arr[0])
-                del image_arr[0]
+                os.replace(imageList[0], './' + dir_name + '/' + imageList[0])
+                del imageList[0]
             except FileNotFoundError as e:
-                del image_arr[0]
-                camera_status = 'FileNotFoundError ' + str(e)
-                error_file = str(e).split("'")
+                msw_status = 'FileNotFoundError ' + str(e)
+                error_file = str(e).split("'")[1]
                 if error_file in os.listdir(dir_name):
+                    del str(e).split("'")[1]
+                    print(error_file)
+                    print(dir_name)
                     pass
-            except Exception as e:
-                camera_status = 'Error' + str(e)
         else:
-            if camera_status is 'ready2finish':  # TODO: 고도 0이면?
-                camera_status = 'finish'
-            time.sleep(1)
-            pass
+            msw_status = 'Finish'
+
+        time.sleep(1)
 
 
 def to_deg(value, loc):
@@ -399,7 +468,7 @@ def main():
     global cap_event
     global CONTROL_E
     global STOP_E
-    global camera_status
+    global msw_status
     global captureImage
     global dir_name
 
@@ -428,22 +497,13 @@ def main():
 
     msw_mqtt_connect()
 
-    ftp_connect()
-
-    if dir_name in ftp_client.nlst():
-        ftp_client.cwd(dir_name)
-    else:
-        ftp_client.mkd(dir_name)
-        ftp_client.cwd(dir_name)
-
     t = threading.Thread(target=send_status, )
     t.start()
 
+    ftp_connect()
+
     sendtoFTP = threading.Thread(target=send_image2ftp, )
     sendtoFTP.start()
-
-    retrieveImage = threading.Thread(target=ret_imagefile, )
-    retrieveImage.start()
 
     while True:
         if cap_event & CONTROL_E:
@@ -451,9 +511,13 @@ def main():
             action()
 
         elif cap_event & STOP_E:
-            captureImage.terminate()
-            print('Stop taking pictures')
-            camera_status = 'stop'
+            try:
+                captureImage.terminate()
+                print('Stop taking pictures')
+                msw_status = 'Stop'
+            except AttributeError as e:
+                print('Before start')
+
             cap_event &= (~STOP_E)
 
 
