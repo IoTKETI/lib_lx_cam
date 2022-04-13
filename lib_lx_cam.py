@@ -302,12 +302,12 @@ def insert_geotag(img_file):
     global gpi_data
 
     print_flag = False
-
+    '''
     # TODO: 아래 임시 좌표 삭제
     gpi_data['lat'] = 36.08584746715721
     gpi_data['lon'] = 126.873364002257
     gpi_data['alt'] = 50.03
-
+    '''
     exif_dict = piexif.load(img_file)
     if print_flag:
         print('==============================================================')
@@ -408,11 +408,13 @@ def insert_geotag(img_file):
     if piexif.GPSIFD.GPSAltitude in exif_dict["GPS"]:
         if print_flag:
             print("GPSAltitude is", (exif_dict["GPS"][piexif.GPSIFD.GPSAltitude]))
+    '''
     else:
         f = Fraction(str(gpi_data['alt']))
         exif_dict["GPS"][piexif.GPSIFD.GPSAltitude] = (f.numerator, f.denominator)
         gps_alt_bytes = piexif.dump(exif_dict)
         piexif.insert(gps_alt_bytes, img_file)
+    '''
     if piexif.GPSIFD.GPSAltitudeRef in exif_dict["GPS"]:  # 절대고도 해수면 위-0 / 해수면 아래-1
         if print_flag:
             print("GPSAltitudeRef is", (exif_dict["GPS"][piexif.GPSIFD.GPSAltitudeRef]).decode('utf-8'))
