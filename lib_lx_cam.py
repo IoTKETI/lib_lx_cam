@@ -4,7 +4,6 @@ import json
 import os
 import threading
 import time
-import glob
 import subprocess
 
 import paho.mqtt.client as mqtt
@@ -139,15 +138,15 @@ def send_status():
     finish_count = 0
     while True:
         if 'Init' in msw_status:
-            if mqtt_status is 'connected' and ftp_status is 'connected':
+            if mqtt_status == 'connected' and ftp_status == 'connected':
                 msw_status = 'Ready'
             else:
-                if mqtt_status is not 'connected':
+                if mqtt_status != 'connected':
                     msw_status = 'Init - MQTT is not connected'
-                elif ftp_status is not 'connected':
+                elif ftp_status != 'connected':
                     msw_status = 'Init - FTP is not connected'
 
-        elif msw_status is 'Finish':
+        elif msw_status == 'Finish':
             finish_count += 1
             if finish_count > 3:
                 msw_status = 'Ready'
@@ -191,15 +190,13 @@ def ret_imagefile():
     #     else:
     #         msw_status = 'Finish'
     #         image_arr = files
-    # 
+    #
     # return image_arr
 
-    files = os.popen('ls')
-    file_arr = files.read()
-    file_arr = file_arr.split('\n')
-    file_arr = list(filter(filtering, file_arr))
+    files = os.listdir('./')
+    file_arr = list(filter(filtering, files))
 
-    if msw_status is 'Stop':
+    if msw_status == 'Stop':
         if len(file_arr) > 0:
             msw_status = 'Ready2Finish'
             file_arr.sort(key=os.path.getmtime)
@@ -251,7 +248,7 @@ def send_image2ftp():
     while True:
         imageList = ret_imagefile()
         if len(imageList) > 0:
-            if dir_name is not '' and not crt_flag:
+            if dir_name != '' and not crt_flag:
                 if dir_name in ftp_client.nlst():
                     ftp_client.cwd(dir_name)
                 else:
