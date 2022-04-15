@@ -242,6 +242,7 @@ def send_image2ftp():
     global ftp_client
     global msw_status
     global dir_name
+    global gpi_data
 
     crt_flag = False
 
@@ -260,9 +261,9 @@ def send_image2ftp():
                 insert_geotag(imageList[0])
                 time.sleep(1)
                 sending_file = open(imageList[0], 'rb')
-                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + imageList[0], sending_file)
+                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + imageList[0][:-4] + '-' + str(gpi_data['lat']) + '-' + str(gpi_data['lon']) + '-' + str(gpi_data['relative_alt']) + '.jpg', sending_file)
                 sending_file.close()
-                os.replace(imageList[0], './' + dir_name + '/' + imageList[0])
+                os.replace(imageList[0], './' + dir_name + '/' + imageList[0][:-4] + '-' + str(gpi_data['lat']) + '-' + str(gpi_data['lon']) + '-' + str(gpi_data['relative_alt']) + '.jpg')
                 del imageList[0]
             except FileNotFoundError as e:
                 msw_status = 'FileNotFoundError ' + str(e)
@@ -504,6 +505,9 @@ def main():
     sendtoFTP = threading.Thread(target=send_image2ftp, )
     sendtoFTP.start()
 
+    captureImage = subprocess.Popen(
+        ['gphoto2', '--summary'], stdout=subprocess.PIPE)
+
     while True:
         if cap_event & CONTROL_E:
             cap_event &= (~CONTROL_E)
@@ -522,4 +526,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
