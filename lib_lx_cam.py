@@ -45,6 +45,7 @@ dir_name = ''
 
 captureImage = None
 interval = 3
+gpi_arr = []
 
 
 def on_connect(client, userdata, flags, rc):
@@ -162,6 +163,8 @@ def action():
     global msw_status
     global captureImage
     global interval
+    global gpi_data
+    global gpi_arr
 
     try:
         captureImage = subprocess.Popen(
@@ -261,9 +264,9 @@ def send_image2ftp():
                 insert_geotag(imageList[0])
                 time.sleep(1)
                 sending_file = open(imageList[0], 'rb')
-                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + imageList[0][:-4] + '-' + str(gpi_data['lat']) + '-' + str(gpi_data['lon']) + '-' + str(gpi_data['relative_alt']) + '.jpg', sending_file)
+                ftp_client.storbinary('STOR ' + '/' + dir_name + '/' + imageList[0], sending_file)
                 sending_file.close()
-                os.replace(imageList[0], './' + dir_name + '/' + imageList[0][:-4] + '-' + str(gpi_data['lat']) + '-' + str(gpi_data['lon']) + '-' + str(gpi_data['relative_alt']) + '.jpg')
+                os.replace(imageList[0], './' + dir_name + '/' + imageList[0])
                 del imageList[0]
             except FileNotFoundError as e:
                 msw_status = 'FileNotFoundError ' + str(e)
