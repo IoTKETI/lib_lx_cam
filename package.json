@@ -1,0 +1,27 @@
+{
+  "name": "lib_lx_cam",
+  "version": "1.0.0",
+  "description": "Mission Library for LX Land Information Acquisition ",
+  "main": "lib_lx_cam.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IoTKETI/lib_lx_cam.git"
+  },
+  "author": "Wonseok Jung",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/IoTKETI/lib_lx_cam/issues"
+  },
+  "homepage": "https://github.com/IoTKETI/lib_lx_cam#readme",
+  "dependencies": {
+    "basic-ftp": "^4.6.6",
+    "exif": "^0.6.0",
+    "moment": "^2.29.2",
+    "mqtt": "^4.3.7",
+    "nanoid": "^3.3.2",
+    "piexifjs": "^1.0.6"
+  }
+}

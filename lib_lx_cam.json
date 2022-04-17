@@ -4,7 +4,7 @@
     "description": "[name]",
     "scripts": "./lib_lx_cam",
     "data": [
-        "Status"
+        "Status", "Captured_GPS"
     ],
     "control": [
         "Capture"
